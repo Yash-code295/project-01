@@ -1,0 +1,464 @@
+<!DOCTYPE html> 
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>KBC — Full Quiz</title>
+  <style>
+    :root{--bg:#001f3f;--panel:#012a63;--gold:#f0c45a;--muted:#9fb6d6}
+    *{box-sizing:border-box}
+    body{margin:0;background:linear-gradient(180deg,var(--bg),#021422);font-family:Inter,Arial,Helvetica,sans-serif;color:#fff}
+    .container{max-width:980px;margin:20px auto;padding:18px}
+    .header{display:flex;align-items:center;gap:16px}
+    .logo{width:78px;height:78px;border-radius:10px;background:linear-gradient(135deg,var(--gold),#d49e2a);display:flex;align-items:center;justify-content:center;color:#042039;font-weight:900;font-size:20px}
+    h1{margin:0;font-size:20px}
+    .sub{color:var(--muted);font-size:13px}
+    .game{display:grid;grid-template-columns:1fr 320px;gap:18px;margin-top:18px}
+    .panel{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));padding:16px;border-radius:12px;box-shadow:0 8px 30px rgba(2,6,23,0.6)}
+    .questionBox{min-height:220px}
+    #question-text{font-size:20px;margin:0 0 12px}
+    #timer{font-size:20px;font-weight:800;color:var(--gold);margin-bottom:10px}
+    .options{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .option{padding:12px 10px;border-radius:8px;border:2px solid rgba(255,255,255,0.06);background:rgba(0,0,0,0.08);cursor:pointer;font-weight:700;display:flex;gap:8px;align-items:center;transition:all .18s}
+    .option:hover{transform:translateY(-3px)}
+    .option.disabled{opacity:0.45;pointer-events:none}
+    .option.correct{background:linear-gradient(90deg,#8fe08f,#66c466);color:#022205;border-color:#66c466}
+    .option.wrong{background:linear-gradient(90deg,#f28a8a,#e64e4e);color:#2b0202;border-color:#e64e4e}
+    .controls{display:flex;gap:10px;align-items:center;margin-top:12px}
+    .btn{background:var(--gold);color:#042039;padding:10px 14px;border-radius:8px;border:none;font-weight:800;cursor:pointer}
+    .btn.secondary{background:transparent;color:var(--muted);border:1px solid rgba(255,255,255,0.05)}
+    .lifelines{display:flex;gap:8px}
+    .lifeline{background:#083a6b;padding:8px 10px;border-radius:8px;color:var(--muted);font-weight:700;border:1px solid rgba(255,255,255,0.03);cursor:pointer}
+    .sidebar .money{font-weight:800;color:var(--gold);text-align:center;margin-bottom:10px}
+    .status{margin-top:12px;color:var(--muted)}
+    .center{display:flex;align-items:center;justify-content:center}
+    /* Start overlay */
+    #startOverlay{position:fixed;inset:0;background:linear-gradient(90deg,rgba(0,0,0,0.8),rgba(0,0,0,0.6));display:flex;align-items:center;justify-content:center;z-index:9999}
+    #startOverlay .sheet{background:linear-gradient(180deg,#012a63,#001f47);padding:30px;border-radius:14px;text-align:center;box-shadow:0 10px 50px rgba(0,0,0,0.7)}
+    #startOverlay button{font-size:22px;padding:14px 28px;border-radius:10px;border:none;background:var(--gold);cursor:pointer}
+    @media (max-width:920px){.game{grid-template-columns:1fr;}.sidebar{order:2}}
+  </style>
+  </style>
+  </style>
+
+    <audio id="audio-start" src="start.mp3" preload="auto"></audio>
+  <audio id="audio-bg" src="bg.mp3" preload="auto" loop></audio>
+  <audio id="audio-question" src="question.mp3" preload="auto"></audio>
+  <audio id="audio-clock" src="clock.mp3" preload="auto" loop></audio>
+  <audio id="audio-lock" src="lock.mp3" preload="auto"></audio>
+  <audio id="audio-confirm" src="confirm.mp3" preload="auto"></audio>
+  <audio id="audio-correct" src="correct.mp3" preload="auto"></audio>
+  <audio id="audio-wrong" src="wrong.mp3" preload="auto"></audio>
+</head>
+<body>
+  <div id="startOverlay">
+    <div class="sheet">
+      <h2 style="margin-top:0">Welcome to KBC — Play Now</h2>
+      <p style="color:var(--muted)">Click START to begin the game.</p>
+      <button id="startBtn">START</button>
+    </div>
+  </div>
+
+  <div class="container" id="mainApp" style="display:none">
+    <div class="header">
+      <div class="logo">KBC</div>
+      <div>
+        <h1>KBC — General Knowledge</h1>
+        <div class="sub">Realistic KBC flow: audio prompts, lock/confirm, lifelines</div>
+      </div>
+    </div>
+
+    <div class="game">
+      <div class="panel questionPanel">
+        <div class="questionBox">
+          <div id="timer">Time: <span id="timeValue">30</span>s</div>
+          <div id="question-text">Loading questions...</div>
+          <div class="options" id="options"></div>
+        </div>
+
+        <div class="controls">
+          <div class="lifelines">
+            <button class="lifeline" id="btn5050">50-50</button>
+            <button class="lifeline" id="btnSwitch">Switch</button>
+            <button class="lifeline" id="btnAudience">Audience</button>
+          </div>
+
+          <div style="margin-left:auto;display:flex;gap:8px">
+            <button class="btn secondary" id="btnLock">Lock Answer</button>
+            <button class="btn" id="btnNext">Next</button>
+          </div>
+        </div>
+
+        <div class="status" id="statusBar">Question <strong id="qIndex">0</strong> / <strong id="qTotal">0</strong> · Score: <strong id="score">0</strong></div>
+      </div>
+
+      <div class="panel sidebar">
+        <div class="money">Money Ladder</div>
+        <div id="ladder"></div>
+        <div class="status center" style="margin-top:14px">
+          <div style="text-align:left;width:100%">
+            <div>50-50 used: <span id="used5050">No</span></div>
+            <div>Switch used: <span id="usedSwitch">No</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function(){
+  // audio elements
+  const audioStart   = document.getElementById('audio-start');
+  const audioBG      = document.getElementById('audio-bg');
+  const audioQ       = document.getElementById('audio-question');
+  const audioClock   = document.getElementById('audio-clock');
+  const audioLock    = document.getElementById('audio-lock');
+  const audioConfirm = document.getElementById('audio-confirm');
+  const audioCorrect = document.getElementById('audio-correct');
+  const audioWrong   = document.getElementById('audio-wrong');
+
+  function safePlay(a){
+    if(!a) return;
+    a.pause();
+    a.currentTime = 0;
+    // catch promise rejection
+    a.play().catch(()=>{ /* autoplay blocked or other issue */ });
+  }
+  function safeStop(a){ try{ a.pause(); a.currentTime = 0;}catch(e){} }
+
+  // question bank (example)
+  const questions = [
+    {q:"Which is the largest planet in our Solar System?", c:["Earth","Mars","Jupiter","Venus"], a:2},
+    {q:"Who wrote the epic 'Ramayana'?", c:["Valmiki","Tulsidas","Ved Vyas","Kalidas"], a:0},
+    {q:"What is the capital of Australia?", c:["Sydney","Canberra","Melbourne","Perth"], a:1},
+    {q:"Which element has the chemical symbol 'O'?", c:["Gold","Oxygen","Silver","Iron"], a:1},
+    {q:"What is the freezing point of water in Celsius?", c:["100","0","32","-1"], a:1},
+    {
+  q: "Which is the longest river in the world?",
+  c: ["Amazon", "Nile", "Yangtze", "Mississippi"],
+  a: 1
+},
+{
+  q: "Who was the first President of India?",
+  c: ["Dr. Rajendra Prasad", "Jawaharlal Nehru", "Sardar Patel", "Dr. Radhakrishnan"],
+  a: 0
+},
+{
+  q: "Which is the smallest continent in the world?",
+  c: ["Europe", "Australia", "South America", "Antarctica"],
+  a: 1
+},
+{
+  q: "What is the chemical formula of water?",
+  c: ["H2O", "CO2", "O2", "N2"],
+  a: 0
+},
+{
+  q: "Who discovered gravity?",
+  c: ["Albert Einstein", "Isaac Newton", "Galileo Galilei", "Niels Bohr"],
+  a: 1
+},
+{
+  q: "Which Indian city is known as the Pink City?",
+  c: ["Udaipur", "Jodhpur", "Jaipur", "Agra"],
+  a: 2
+},
+{
+  q: "Which device is used to measure temperature?",
+  c: ["Barometer", "Thermometer", "Hygrometer", "Ammeter"],
+  a: 1
+},
+{
+  q: "Which is the national fruit of India?",
+  c: ["Apple", "Banana", "Mango", "Guava"],
+  a: 2
+},
+{
+  q: "What is the square root of 144?",
+  c: ["10", "11", "12", "14"],
+  a: 2
+},
+{
+  q: "Who invented the telephone?",
+  c: ["Graham Bell", "Thomas Edison", "Nikola Tesla", "James Watt"],
+  a: 0
+}
+
+  ];
+
+  // state
+  let idx = 0;
+  let score = 0;
+  let used5050 = false;
+  let usedSwitch = false;
+  let disabledSet = new Set();
+  let locked = false;
+  let selectedIndex = null;
+  const secondsPerQ = 30;
+  let timeLeft = secondsPerQ;
+  let timerInterval = null;
+
+  // DOM refs
+  const startOverlay = document.getElementById('startOverlay');
+  const startBtn = document.getElementById('startBtn');
+  const mainApp = document.getElementById('mainApp');
+  const qText = document.getElementById('question-text');
+  const optionsEl = document.getElementById('options');
+  const qIndexEl = document.getElementById('qIndex');
+  const qTotalEl = document.getElementById('qTotal');
+  const scoreEl = document.getElementById('score');
+  const used5050El = document.getElementById('used5050');
+  const usedSwitchEl = document.getElementById('usedSwitch');
+  const ladderEl = document.getElementById('ladder');
+  const btn5050 = document.getElementById('btn5050');
+  const btnSwitch = document.getElementById('btnSwitch');
+  const btnAudience = document.getElementById('btnAudience');
+  const btnLock = document.getElementById('btnLock');
+  const btnNext = document.getElementById('btnNext');
+  const timeValueEl = document.getElementById('timeValue');
+
+  // ladder
+  const ladder = ["\u20B9100","\u20B9250","\u20B9400","\u20B91,000","\u20B92,500","\u20B95,000","\u20B910,000","\u20B920,000","\u20B940,000","\u20B980,000"];
+
+  function renderLadder(){
+    ladderEl.innerHTML = '';
+    // FIX 1: Iterate backward to show highest prize money at the top, like a real ladder
+    for(let i=ladder.length-1;i>=0;i--){
+      const el = document.createElement('div');
+      el.style.padding='6px 8px';
+      el.style.borderRadius='6px';
+      el.style.marginBottom='6px';
+      
+      // Highlight the current question index (i corresponds to the 0-indexed question index)
+      if(i === idx) el.style.background='linear-gradient(90deg,var(--gold),#d9b24a)';
+      
+      // i+1 is the question number (e.g., Q10 for i=9)
+      el.innerHTML = `<strong>#${i+1}</strong><span style="float:right">${ladder[i]||''}</span>`;
+      ladderEl.appendChild(el);
+    }
+  }
+
+  function showGameOver(){
+    optionsEl.innerHTML = `<div style="text-align:center;padding:30px"><h2>Game Over</h2><p>Your Score: <strong>${score}</strong> / ${questions.length}</p></div>`;
+    qText.textContent = 'Thanks for playing!';
+    qIndexEl.textContent = questions.length;
+    scoreEl.textContent = score;
+    stopTimer();
+    safeStop(audioClock);
+    safeStop(audioQ);
+    safeStop(audioBG);
+    btn5050.disabled = btnSwitch.disabled = btnAudience.disabled = btnLock.disabled = btnNext.disabled = true;
+  }
+
+  function stopTimer(){
+    if(timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+  }
+
+  function startTimer(){
+    stopTimer();
+    timeLeft = secondsPerQ;
+    timeValueEl.textContent = timeLeft;
+    safePlay(audioClock);
+    timerInterval = setInterval(()=>{
+      timeLeft--;
+      timeValueEl.textContent = timeLeft;
+      if(timeLeft <= 0){
+        stopTimer();
+        // time up -> auto lock as wrong
+        onTimeUp();
+      }
+    },1000);
+  }
+
+  function onTimeUp(){
+    // simulate no selection => reveal wrong
+    locked = true;
+    safeStop(audioClock);
+    safePlay(audioWrong);
+    revealAnswer(-1);
+  }
+
+  function loadQuestion(){
+    if(idx < 0 || idx >= questions.length) { showGameOver(); return; }
+    // reset
+    locked = false;
+    selectedIndex = null;
+    // disabledSet is maintained between loads if 50-50 was used
+
+    optionsEl.innerHTML = '';
+
+    const q = questions[idx];
+    qText.textContent = q.q;
+    qIndexEl.textContent = idx + 1;
+    qTotalEl.textContent = questions.length;
+    scoreEl.textContent = score;
+    used5050El.textContent = used5050 ? 'Yes' : 'No';
+    usedSwitchEl.textContent = usedSwitch ? 'Yes' : 'No';
+    renderLadder();
+
+    // render options
+    q.c.forEach((txt,i)=>{
+      const btn = document.createElement('button');
+      btn.className = 'option';
+      btn.dataset.i = i;
+      btn.innerHTML = `<strong>${String.fromCharCode(65+i)}.</strong> <span style="margin-left:8px">${txt}</span>`;
+      
+      // FIX 2: Check disabledSet and actually disable the button element
+      if(disabledSet.has(i)) {
+        btn.classList.add('disabled');
+        btn.disabled = true; // This is the crucial fix for 50-50
+      }
+      
+      btn.addEventListener('click', ()=> {
+        if(locked) return;
+        // clear previous selected visual
+        document.querySelectorAll('.option').forEach(x=>x.classList.remove('selected'));
+        btn.classList.add('selected');
+        selectedIndex = i;
+      });
+      optionsEl.appendChild(btn);
+    });
+
+    // play audios
+    safePlay(audioQ);
+    safePlay(audioBG);
+    startTimer();
+  }
+
+  function revealAnswer(sel){
+    // reveals answer visually
+    if(idx < 0 || idx >= questions.length) return;
+    const q = questions[idx];
+    const btns = Array.from(document.querySelectorAll('.option'));
+    btns.forEach(b=>b.classList.add('disabled')); // Disable all options after lock
+    const correctIdx = q.a;
+
+    if(sel === correctIdx){
+      const b = btns.find(b=>Number(b.dataset.i) === correctIdx);
+      if(b) b.classList.add('correct');
+      safePlay(audioCorrect);
+      score++;
+    } else {
+      const selectedBtn = btns.find(b=>Number(b.dataset.i) === sel);
+      const correctBtn = btns.find(b=>Number(b.dataset.i) === correctIdx);
+      if(selectedBtn) selectedBtn.classList.add('wrong');
+      if(correctBtn) correctBtn.classList.add('correct');
+      safePlay(audioWrong);
+    }
+    scoreEl.textContent = score;
+  }
+
+  // lifelines
+  function lifeline5050(){
+    if(used5050){ alert('50-50 already used'); return; }
+    const q = questions[idx];
+    // Get the indices of the three wrong answers
+    const wrongs = [0,1,2,3].filter(i=>i!==q.a);
+    // Shuffle the wrong answers
+    wrongs.sort(()=>Math.random()-0.5);
+    // Hide two of the wrong answers
+    const hide = wrongs.slice(0,2);
+    hide.forEach(i=>disabledSet.add(i));
+    
+    used5050 = true;
+    loadQuestion(); // Reload question to apply the disabled state
+    btn5050.disabled = true;
+  }
+
+  function lifelineSwitch(){
+    if(usedSwitch){ alert('Switch already used'); return; }
+    // for demo: shuffle remaining questions and replace current with another from list
+    const available = questions.filter((_,i)=>i !== idx);
+    if(available.length === 0){ alert('No questions to switch with'); return; }
+    // pick random other question and swap with current
+    const pickIdx = Math.floor(Math.random()*available.length);
+    const other = available[pickIdx];
+    // find its index in questions
+    const otherRealIndex = questions.findIndex(q=>q.q === other.q && q !== questions[idx]);
+    if(otherRealIndex >= 0){
+      const tmp = questions[idx];
+      questions[idx] = questions[otherRealIndex];
+      questions[otherRealIndex] = tmp;
+      usedSwitch = true;
+      loadQuestion();
+    } else {
+      // fallback: rotate
+      questions.push(questions.shift());
+      usedSwitch = true;
+      loadQuestion();
+    }
+    btnSwitch.disabled = true;
+  }
+
+  function lifelineAudience(){
+    const q = questions[idx];
+    alert(`Audience poll suggests option ${String.fromCharCode(65+q.a)} is most popular.`);
+    btnAudience.disabled = true;
+  }
+
+  // UI handlers
+  btn5050.addEventListener('click', lifeline5050);
+  btnSwitch.addEventListener('click', lifelineSwitch);
+  btnAudience.addEventListener('click', lifelineAudience);
+
+  btnLock.addEventListener('click', ()=>{
+    if(locked) return;
+    if(selectedIndex === null){ alert('Please select an option first'); return; }
+    locked = true;
+    stopTimer();
+    safeStop(audioClock);
+    safePlay(audioLock);
+    
+    // Visually mark the selected option as locked/confirmed
+    document.querySelectorAll('.option').forEach(x => {
+      x.classList.remove('selected');
+      if(Number(x.dataset.i) === selectedIndex) {
+        x.style.backgroundColor = 'var(--panel)'; // Subtle change for locked
+        x.style.borderColor = 'var(--gold)';
+      }
+    });
+
+    setTimeout(()=>{
+      safePlay(audioConfirm);
+      setTimeout(()=>{
+        revealAnswer(selectedIndex);
+      },700);
+    },600);
+  });
+
+  btnNext.addEventListener('click', ()=>{
+    // go next
+    idx++;
+    if(idx >= questions.length){ showGameOver(); return; }
+    loadQuestion();
+  });
+
+  // START button: required to allow autoplay of audio in modern browsers
+  startBtn.addEventListener('click', ()=>{
+    // hide overlay, show main
+    startOverlay.style.display = 'none';
+    mainApp.style.display = 'block';
+    // play start then start bg; then load first question after short delay
+    safePlay(audioStart);
+    setTimeout(()=>{
+      // start bg slightly after start audio
+      audioBG.volume = 0.35;
+      safePlay(audioBG);
+      loadQuestion();
+    }, 1200);
+  });
+
+  // expose timeValue element for timer display
+  const timeValueSpan = document.getElementById('timeValue');
+  if(timeValueSpan) timeValueSpan.textContent = secondsPerQ || 30;
+
+  // initial DOM values
+  qTotalEl.textContent = questions.length;
+  qIndexEl.textContent = 0;
+  scoreEl.textContent = score;
+  renderLadder();
+
+})(); // end IIFE
+</script>
+</body>
+</html>
